@@ -10,3 +10,5 @@ edition = "2018"
 reqwest = { version = "0.11.3", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
+websocket = "0.26.2"
+native-tls = "0.2.7"

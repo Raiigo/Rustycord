@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 use websocket::{ClientBuilder, Message, header::Authorization};
 use native_tls::*;
 use io;
+use serde_json::Value;
 
 #[derive(Deserialize)]
 struct SessionStartLimit {
@@ -25,6 +26,60 @@ impl GatewayInfos {
     pub fn get_url(&self) -> &str {
         return &self.url;
     }
+}
+
+#[derive(Deserialize)]
+struct GuildMember {
+    roles: Vec<String>,
+    premium_since: String,
+    pending: bool,
+    nick: String,
+    mute: bool,
+    joined_at: String,
+    is_pending: bool,
+    hoisted_role: String,
+    deaf: bool,
+    avatar: String,
+}
+
+#[derive(Deserialize)]
+struct User {
+    username: String,
+    public_flags: i32,
+    id: String,
+    discriminator: String,
+    avatar: String,
+}
+
+#[derive(Deserialize)]
+struct DiscordMessage {
+    message_type: u16,
+    tts: bool, // Is that message a TTS message
+    timestanp: String, // Time
+    referenced_message: String,
+    pinned: bool,
+    nonce: String,
+    mentions: Vec<String>,
+    mention_roles: Vec<String>,
+    mention_everyone: bool,
+    member: GuildMember,
+    id: String,
+    flags: i32,
+    embeds: Vec<String>,
+    edited_timestamp: String,
+    content: String,
+    components: Vec<String>,
+    channel_id: String,
+    author: User,
+    attachments: Vec<String>,
+    guild_id: String,
+}
+
+#[derive(Deserialize)]
+struct OpCode0 { // Event dispatched
+    t: String, // Event name (MESSAGE_CREATE)
+    s: i32,
+    d: DiscordMessage, // Message
 }
 
 #[tokio::main]
@@ -56,15 +111,15 @@ async fn main() -> reqwest::Result<()> {
 
     match client.set_nonblocking(true) {
         Ok(_) => println!("Nonblocking"),
-        Err(e) => panic!(e),
+        Err(_error) => panic!(),
     }
 
     let mut text_message = match client.recv_message().unwrap() {
         websocket::OwnedMessage::Text(text) => text,
-        websocket::OwnedMessage::Binary(bin) => String::new(),
-        websocket::OwnedMessage::Close(close) => String::new(),
-        websocket::OwnedMessage::Ping(ping) => String::new(),
-        websocket::OwnedMessage::Pong(pong) => String::new(),
+        websocket::OwnedMessage::Binary(_) => String::new(),
+        websocket::OwnedMessage::Close(_) => String::new(),
+        websocket::OwnedMessage::Ping(_) => String::new(),
+        websocket::OwnedMessage::Pong(_) => String::new(),
     };
 
     text_message = text_message.replace("\"t\":null,\"s\":null,", "");
@@ -77,7 +132,7 @@ async fn main() -> reqwest::Result<()> {
 
     thread::spawn(move || -> reqwest::Result<()> {
         let mut delta = std::time::Instant::now();
-        let response = client.send_message(&Message::text(r#"
+        let _response = client.send_message(&Message::text(r#"
         {
             "op": 2,
             "d": {
@@ -103,30 +158,121 @@ async fn main() -> reqwest::Result<()> {
         loop {
             if delta.elapsed().as_millis() == heartbeat_interval {
                 println!("Sending heartbeat ...");
-                client.send_message(&Message::text(r#"{"op": 1,"d": null}"#));
+                client.send_message(&Message::text(r#"{"op": 1,"d": null}"#)).map_or_else(|e|{
+                    dbg!(e);
+                    println!("Error while sending heartbeat");
+                }, |_| {
+                    println!("Heartbeat sent !");
+                });
                 delta = std::time::Instant::now();
             }
             for message in client.recv_message() {
-                println!("{}", match message {
+                let message_text = match message {
                     websocket::OwnedMessage::Text(text) => text,
-                    websocket::OwnedMessage::Binary(bin) => String::new(),
-                    websocket::OwnedMessage::Close(close) => String::new(),
-                    websocket::OwnedMessage::Ping(ping) => String::new(),
-                    websocket::OwnedMessage::Pong(pong) => String::new(),
-                });
+                    websocket::OwnedMessage::Binary(_) => String::new(),
+                    websocket::OwnedMessage::Close(_) => String::new(),
+                    websocket::OwnedMessage::Ping(_) => String::new(),
+                    websocket::OwnedMessage::Pong(_) => String::new(),
+                };
+                println!("{}", message_text);
+                let v: Value = serde_json::from_str(&message_text).unwrap();
+                println!("{}", v["d"]["content"]);
+                let channel_id: String;
+                let content: String = match &v["d"]["content"] {
+                    Value::Null => String::new(),
+                    Value::Bool(_) => String::new(),
+                    Value::Number(_) => String::new(),
+                    Value::String(text) => String::from(text),
+                    Value::Array(_) => String::new(),
+                    Value::Object(_) => String::new(),
+                };
+                println!("{}", content);
+                if content.replace("\"", "").eq("!test") {
+                    println!("Command !test found !");
+                    channel_id = match &v["d"]["channel_id"] {
+                        Value::Null => {
+                            println!("Channel ID doesn't exist");
+                            String::new()
+                        },
+                        Value::Bool(_) => {
+                            println!("Channel ID doesn't exist");
+                            String::new()
+                        },
+                        Value::Number(_) => {
+                            println!("Channel ID doesn't exist");
+                            String::new()
+                        },
+                        Value::String(id) => String::from(id),
+                        Value::Array(_) => {
+                            println!("Channel ID doesn't exist");
+                            String::new()
+                        },
+                        Value::Object(_) => {
+                            println!("Channel ID doesn't exist");
+                            String::new()
+                        },
+                    };
+                    let url: String = format!("https://discord.com/api/v9/channels/{}/messages", channel_id);
+                    println!("{}", url);
+                    if v["d"]["author"]["id"].eq("320522831362523137") {
+                        let name: String = match &v["d"]["member"]["nick"] {
+                            Value::Null => String::from("GUAPO"),
+                            Value::Bool(_) => String::from("GUAPO"),
+                            Value::Number(_) => String::from("GUAPO"),
+                            Value::String(text) => String::from(text),
+                            Value::Array(_) => String::from("GUAPO"),
+                            Value::Object(_) => String::from("GUAPO"),
+                        };
+                        let body = format!("{{
+                            \"content\": \"TG {}\",
+                            \"tts\": false
+                        }}", name);
+                        let res = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        .header("Authorization", "Bot token_artifact")
+                        .header("Content-type", "application/json")
+                        .body(body).send().unwrap();
+                        dbg!(res);
+                    } else if v["d"]["author"]["id"].eq("257231064362254336") {
+                        let res = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        .header("Authorization", "Bot token_artifact")
+                        .header("Content-type", "application/json")
+                        .body(r#"{
+                            "content": "Tu veux jouer à R6 ?",
+                            "tts": false
+                        }"#).send().unwrap();
+                        dbg!(res);
+                    } else if v["d"]["author"]["id"].eq("285213193041608704") {
+                        let res = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        .header("Authorization", "Bot token_artifact")
+                        .header("Content-type", "application/json")
+                        .body(r#"{
+                            "content": "Tu dois 30€ à mon créateur petit batard",
+                            "tts": false
+                        }"#).send().unwrap();
+                        dbg!(res);
+                    } else {
+                        let res = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        .header("Authorization", "Bot token_artifact")
+                        .header("Content-type", "application/json")
+                        .body(r#"{
+                            "content": "Bonjour Homme respectable",
+                            "tts": false
+                        }"#).send().unwrap();
+                        dbg!(res);
+                    }
+
+                }
             }
         }
-        Ok(())
     });
 
     loop {}
 
-    Ok(())
 }
 
-async fn send_heartbeat(client: &mut websocket::client::sync::Client<TlsStream<TcpStream>>, heartbeat_state: &mut bool) {
-    loop {
-        thread::sleep(Duration::from_secs(15));
-        client.send_message(&Message::text(r#"{"op": 1,"d": null}"#));
-    }
-}
+// async fn send_heartbeat(client: &mut websocket::client::sync::Client<TlsStream<TcpStream>>, heartbeat_state: &mut bool) {
+//     loop {
+//         thread::sleep(Duration::from_secs(15));
+//         client.send_message(&Message::text(r#"{"op": 1,"d": null}"#));
+//     }
+// }

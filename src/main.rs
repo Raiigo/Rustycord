@@ -5,6 +5,7 @@ use tokio::*;
 use serde::{Serialize, Deserialize};
 use websocket::{ClientBuilder, Message, header::Authorization};
 use native_tls::*;
+use io;
 
 #[derive(Deserialize)]
 struct SessionStartLimit {
@@ -31,7 +32,7 @@ async fn main() -> reqwest::Result<()> {
 
     let response = reqwest::Client::new()
         .request(Method::GET, "https://discord.com/api/v9/gateway/bot")
-        .header("Authorization", "Bot token_artifact")
+        .header("Authorization", "Bot NzkxNjM2MjQyNDE2MDA5MjU2.X-SCtA.X1hcXGK1zodP165KY1Smn83iiDQ")
         .send().await?.json::<GatewayInfos>().await;
 
     let gateway_infos = match response {
@@ -47,11 +48,16 @@ async fn main() -> reqwest::Result<()> {
     println!("Ok !");
 
     let mut headers = websocket::header::Headers::new();
-    headers.set(Authorization("Bot token_artifact".to_owned()));
+    headers.set(Authorization("Bot NzkxNjM2MjQyNDE2MDA5MjU2.X-SCtA.X1hcXGK1zodP165KY1Smn83iiDQ".to_owned()));
 
     let mut client = ClientBuilder::new(gateway_infos.get_url()).unwrap()
         .custom_headers(&headers)
-        .connect_secure(Some(TlsConnector::new().unwrap())).unwrap();
+        .connect_secure(None).unwrap();
+
+    match client.set_nonblocking(true) {
+        Ok(_) => println!("Nonblocking"),
+        Err(e) => panic!(e),
+    }
 
     let mut text_message = match client.recv_message().unwrap() {
         websocket::OwnedMessage::Text(text) => text,
@@ -75,7 +81,7 @@ async fn main() -> reqwest::Result<()> {
         {
             "op": 2,
             "d": {
-              "token": "token_artifact",
+              "token": "NzkxNjM2MjQyNDE2MDA5MjU2.X-SCtA.X1hcXGK1zodP165KY1Smn83iiDQ",
               "intents": 513,
               "properties": {
                 "$os": "linux",
@@ -97,8 +103,17 @@ async fn main() -> reqwest::Result<()> {
         loop {
             if delta.elapsed().as_millis() == heartbeat_interval {
                 println!("Sending heartbeat ...");
-                client.send_message(&Message::text("{\"op\": 11}"));
+                client.send_message(&Message::text(r#"{"op": 1,"d": null}"#));
                 delta = std::time::Instant::now();
+            }
+            for message in client.recv_message() {
+                println!("{}", match message {
+                    websocket::OwnedMessage::Text(text) => text,
+                    websocket::OwnedMessage::Binary(bin) => String::new(),
+                    websocket::OwnedMessage::Close(close) => String::new(),
+                    websocket::OwnedMessage::Ping(ping) => String::new(),
+                    websocket::OwnedMessage::Pong(pong) => String::new(),
+                });
             }
         }
         Ok(())
@@ -112,6 +127,6 @@ async fn main() -> reqwest::Result<()> {
 async fn send_heartbeat(client: &mut websocket::client::sync::Client<TlsStream<TcpStream>>, heartbeat_state: &mut bool) {
     loop {
         thread::sleep(Duration::from_secs(15));
-        client.send_message(&Message::text("{\"op\": 11}"));
+        client.send_message(&Message::text(r#"{"op": 1,"d": null}"#));
     }
 }

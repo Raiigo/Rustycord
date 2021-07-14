@@ -32,7 +32,7 @@ async fn main() -> reqwest::Result<()> {
 
     let response = reqwest::Client::new()
         .request(Method::GET, "https://discord.com/api/v9/gateway/bot")
-        .header("Authorization", "Bot NzkxNjM2MjQyNDE2MDA5MjU2.X-SCtA.X1hcXGK1zodP165KY1Smn83iiDQ")
+        .header("Authorization", "Bot token_artifact")
         .send().await?.json::<GatewayInfos>().await;
 
     let gateway_infos = match response {
@@ -48,7 +48,7 @@ async fn main() -> reqwest::Result<()> {
     println!("Ok !");
 
     let mut headers = websocket::header::Headers::new();
-    headers.set(Authorization("Bot NzkxNjM2MjQyNDE2MDA5MjU2.X-SCtA.X1hcXGK1zodP165KY1Smn83iiDQ".to_owned()));
+    headers.set(Authorization("Bot token_artifact".to_owned()));
 
     let mut client = ClientBuilder::new(gateway_infos.get_url()).unwrap()
         .custom_headers(&headers)
@@ -81,7 +81,7 @@ async fn main() -> reqwest::Result<()> {
         {
             "op": 2,
             "d": {
-              "token": "NzkxNjM2MjQyNDE2MDA5MjU2.X-SCtA.X1hcXGK1zodP165KY1Smn83iiDQ",
+              "token": "token_artifact",
               "intents": 513,
               "properties": {
                 "$os": "linux",

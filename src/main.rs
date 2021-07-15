@@ -1,5 +1,6 @@
-use std::{net::TcpStream, thread, time::Duration};
+pub mod utils;
 
+use std::{net::TcpStream, thread, time::Duration};
 use reqwest::*;
 use tokio::*;
 use serde::{Serialize, Deserialize};
@@ -7,6 +8,7 @@ use websocket::{ClientBuilder, Message, header::Authorization};
 use native_tls::*;
 use io;
 use serde_json::Value;
+use crate::utils::guild::channel::*;
 
 #[derive(Deserialize)]
 struct SessionStartLimit {
@@ -175,9 +177,32 @@ async fn main() -> reqwest::Result<()> {
                     websocket::OwnedMessage::Pong(_) => String::new(),
                 };
                 println!("{}", message_text);
-                let v: Value = serde_json::from_str(&message_text).unwrap();
+                let v: Value = serde_json::from_str(&message_text).unwrap(); // Représente le message OP 0
                 println!("{}", v["d"]["content"]);
                 let channel_id: String;
+                channel_id = match &v["d"]["channel_id"] {
+                    Value::Null => {
+                        println!("Channel ID doesn't exist");
+                        String::new()
+                    },
+                    Value::Bool(_) => {
+                        println!("Channel ID doesn't exist");
+                        String::new()
+                    },
+                    Value::Number(_) => {
+                        println!("Channel ID doesn't exist");
+                        String::new()
+                    },
+                    Value::String(id) => String::from(id),
+                    Value::Array(_) => {
+                        println!("Channel ID doesn't exist");
+                        String::new()
+                    },
+                    Value::Object(_) => {
+                        println!("Channel ID doesn't exist");
+                        String::new()
+                    },
+                };
                 let content: String = match &v["d"]["content"] {
                     Value::Null => String::new(),
                     Value::Bool(_) => String::new(),
@@ -187,31 +212,114 @@ async fn main() -> reqwest::Result<()> {
                     Value::Object(_) => String::new(),
                 };
                 println!("{}", content);
+                if content.replace("\"", "").eq("!get_channels") {
+                    let guild_id = match &v["d"]["guild_id"] {
+                        Value::Null => String::from("Guild ID not found"),
+                        Value::Bool(_) => String::from("Guild ID not found"),
+                        Value::Number(_) => String::from("Guild ID not found"),
+                        Value::String(text) => String::from(text),
+                        Value::Array(_) => String::from("Guild ID not found"),
+                        Value::Object(_) => String::from("Guild ID not found"),
+                    };
+                    let url = format!("https://discord.com/api/v9/guilds/{}/channels", guild_id);
+                    println!("{}", url);
+                    let res = reqwest::blocking::Client::new().get(url)
+                        .header("Authorization", "Bot token_artifact")
+                        .send().unwrap();
+                    let mut res_text = res.text().unwrap();
+                    if res_text.len() < 2000 {
+                        println!("<2000");
+                        let body = format!("{{
+                            \"content\": \"{}\",
+                            \"tts\": false
+                        }}", res_text);
+                        let res_post = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                            .header("Authorization", "Bot token_artifact")
+                            .header("Content-type", "application/json")
+                            .body(body).send().unwrap();
+                    } else {
+                        println!(">2000");
+                        println!("{}", res_text);
+                        let channels: Value = serde_json::from_str(&res_text).unwrap();
+                        match channels {
+                            Value::Null => println!(),
+                            Value::Bool(_) => println!(),
+                            Value::Number(_) => println!(),
+                            Value::String(_) => println!(),
+                            Value::Array(list) => {
+                                let number = list.len();
+                                let body = format!("{{
+                                    \"content\": \"Il y a : {} channels\",
+                                    \"tts\": false
+                                }}", number);
+                                let res_post = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                                    .header("Authorization", "Bot token_artifact")
+                                    .header("Content-type", "application/json")
+                                    .body(body).send().unwrap();
+                                dbg!(res_post);
+                                let mut channel_list: String = String::new();
+                                for channel in list {
+                                    let name = match &channel["name"] {
+                                        Value::Null => String::from("Error while getting the name"),
+                                        Value::Bool(_) => String::from("Error while getting the name"),
+                                        Value::Number(_) => String::from("Error while getting the name"),
+                                        Value::String(text) => String::from(text),
+                                        Value::Array(_) => String::from("Error while getting the name"),
+                                        Value::Object(_) => String::from("Error while getting the name"),
+                                    };
+                                    channel_list.push_str(&name);
+                                    channel_list.push_str(",");
+                                }
+                                let body = format!("{{
+                                    \"content\": \"{}\",
+                                    \"tts\": false
+                                }}", channel_list.replace("\"", r#"\""#));
+                                let res_post = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                                    .header("Authorization", "Bot token_artifact")
+                                    .header("Content-type", "application/json")
+                                    .body(body).send().unwrap();
+                                dbg!(res_post);
+                            },
+                            Value::Object(_) => println!(),
+                        }
+                        res_text.truncate(1900);
+                        let body = format!("{{
+                            \"content\": \"```{}```\",
+                            \"tts\": false
+                        }}", res_text.replace("\"", r#"\""#));
+                        println!("{}", body);
+                        // let res_post = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        //     .header("Authorization", "Bot token_artifact")
+                        //     .header("Content-type", "application/json")
+                        //     .body(body).send().unwrap();
+                        // dbg!(res_post);
+                    }
+                }
                 if content.replace("\"", "").eq("!test") {
                     println!("Command !test found !");
-                    channel_id = match &v["d"]["channel_id"] {
-                        Value::Null => {
-                            println!("Channel ID doesn't exist");
-                            String::new()
-                        },
-                        Value::Bool(_) => {
-                            println!("Channel ID doesn't exist");
-                            String::new()
-                        },
-                        Value::Number(_) => {
-                            println!("Channel ID doesn't exist");
-                            String::new()
-                        },
-                        Value::String(id) => String::from(id),
-                        Value::Array(_) => {
-                            println!("Channel ID doesn't exist");
-                            String::new()
-                        },
-                        Value::Object(_) => {
-                            println!("Channel ID doesn't exist");
-                            String::new()
-                        },
-                    };
+                    // channel_id = match &v["d"]["channel_id"] {
+                    //     Value::Null => {
+                    //         println!("Channel ID doesn't exist");
+                    //         String::new()
+                    //     },
+                    //     Value::Bool(_) => {
+                    //         println!("Channel ID doesn't exist");
+                    //         String::new()
+                    //     },
+                    //     Value::Number(_) => {
+                    //         println!("Channel ID doesn't exist");
+                    //         String::new()
+                    //     },
+                    //     Value::String(id) => String::from(id),
+                    //     Value::Array(_) => {
+                    //         println!("Channel ID doesn't exist");
+                    //         String::new()
+                    //     },
+                    //     Value::Object(_) => {
+                    //         println!("Channel ID doesn't exist");
+                    //         String::new()
+                    //     },
+                    // };
                     let url: String = format!("https://discord.com/api/v9/channels/{}/messages", channel_id);
                     println!("{}", url);
                     if v["d"]["author"]["id"].eq("320522831362523137") {

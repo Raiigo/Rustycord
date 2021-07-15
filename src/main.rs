@@ -258,7 +258,14 @@ async fn main() -> reqwest::Result<()> {
                                     .body(body).send().unwrap();
                                 dbg!(res_post);
                                 let mut channel_list: String = String::new();
+                                println!("----------------------------------------------------");
+                                println!("{}", &list[4].to_string());
+                                println!("----------------------------------------------------");
+                                let voc1_json: &String = &list[4].to_string().replace("type", "channel_type");
+                                let voc1: TextChannel = serde_json::from_str(voc1_json).unwrap();
+                                dbg!(voc1);
                                 for channel in list {
+                                    println!("{}", channel);
                                     let name = match &channel["name"] {
                                         Value::Null => String::from("Error while getting the name"),
                                         Value::Bool(_) => String::from("Error while getting the name"),

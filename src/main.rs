@@ -1,4 +1,5 @@
 pub mod utils;
+pub mod core;
 
 use std::{net::TcpStream, thread, time::Duration};
 use reqwest::*;
@@ -9,6 +10,7 @@ use native_tls::*;
 use io;
 use serde_json::Value;
 use crate::utils::guild::channel::*;
+use crate::core::bot::Bot;
 
 #[derive(Deserialize)]
 struct SessionStartLimit {
@@ -86,6 +88,19 @@ struct OpCode0 { // Event dispatched
 
 #[tokio::main]
 async fn main() -> reqwest::Result<()> {
+
+    
+    
+
+    // thread::spawn(move || {
+    //     let bot = Bot::new("token_artifact", Box::new(|| {
+    //         true
+    //     }));
+    //     let gateway = bot.get_gateway_infos();
+    //     println!("Gateway info from bot struct : ");
+    //     dbg!(gateway);
+    // });
+    
 
     let response = reqwest::Client::new()
         .request(Method::GET, "https://discord.com/api/v9/gateway/bot")
@@ -302,6 +317,64 @@ async fn main() -> reqwest::Result<()> {
                         // dbg!(res_post);
                     }
                 }
+
+                
+                if content.replace("\"", "").starts_with("!kda") {
+                    let player_name = content.replace("\"", "").replace("!kda", "").replace(" ", "");
+                    println!("KDA command detected !");
+                    let kda_res = reqwest::blocking::Client::new().get(format!("http://127.0.0.1/kda/{}", player_name))
+                        .send().unwrap().text().unwrap();
+                    println!("{}", kda_res);
+                    let mut kda_list: Vec<String> = kda_res.split("\n").map(|e| {
+                         e.to_owned()
+                    }).collect();
+                    kda_list.remove(10);
+                    let list_len = 10;
+                    let mut kill_sum: i32 = 0;
+                    let mut death_sum: i32 = 0;
+                    let mut assist_sum: i32 = 0;
+                    for kda in kda_list {
+                        let kda_clean = kda.replace("\n", "");
+                        println!("{}", kda_clean);
+                        // println!("{}", kda.split('/').nth(0).unwrap());
+                        // println!("{}", kda.split('/').nth(1).unwrap());
+                        // println!("{}", kda.split('/').nth(2).unwrap());
+                        let comp_list: Vec<i32> = kda_clean.split('/').map(|e| {
+                            println!("{}", e);
+                            e.trim().parse::<i32>().unwrap()
+                        }).collect();
+                        // for c in comp_list {
+                        //     println!("{}", c);
+                        // }
+                        let kill: i32 = comp_list[0];
+                        kill_sum = kill_sum + kill;
+                        let death: i32 = comp_list[1];
+                        death_sum = death_sum + death;
+                        let assist: i32 = comp_list[2];
+                        assist_sum = assist_sum + assist;
+                    }
+                    let kill_mean: f64 = f64::from(kill_sum) / f64::from(list_len);
+                    let death_mean: f64 = f64::from(death_sum) / f64::from(list_len);
+                    let assist_mean: f64 = f64::from(assist_sum) / f64::from(list_len);
+                    let kda_mean = format!("{}/{}/{}", kill_mean, death_mean, assist_mean);
+                    let res = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        .header("Authorization", "Bot token_artifact")
+                        .header("Content-type", "application/json")
+                        .body(format!("{{
+                            \"content\": \"{}\",
+                            \"tts\": false
+                        }}", kda_res.replace("\n", "\\n"))).send().unwrap();
+                    dbg!(res);
+                    let res = reqwest::blocking::Client::new().post(format!("https://discord.com/api/v9/channels/{}/messages", channel_id))
+                        .header("Authorization", "Bot token_artifact")
+                        .header("Content-type", "application/json")
+                        .body(format!("{{
+                            \"content\": \"Moyenne : {}\",
+                            \"tts\": false
+                        }}", kda_mean)).send().unwrap();
+                    dbg!(res);
+                }
+
                 if content.replace("\"", "").eq("!test") {
                     println!("Command !test found !");
                     // channel_id = match &v["d"]["channel_id"] {
@@ -384,10 +457,3 @@ async fn main() -> reqwest::Result<()> {
     loop {}
 
 }
-
-// async fn send_heartbeat(client: &mut websocket::client::sync::Client<TlsStream<TcpStream>>, heartbeat_state: &mut bool) {
-//     loop {
-//         thread::sleep(Duration::from_secs(15));
-//         client.send_message(&Message::text(r#"{"op": 1,"d": null}"#));
-//     }
-// }
